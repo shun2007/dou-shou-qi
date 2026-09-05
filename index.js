@@ -383,7 +383,11 @@ async function llmTurn(){
       selPos=[fr,fc];moves=valids;executeMove(tr,tc,'llm');
     }else if(decision.action==='skill'&&decision.skill){
       const ok=executeAISkill(decision.skill,decision.targets||[]);
-      if(!ok)aiTurn();
+      if(!ok){aiTurn();return;}
+      /* 辅助技能(金身/硬化/挖坑等)不结束回合，需自动补一步棋 */
+      setTimeout(()=>{
+        if(!over&&curPlayer===2&&isThinking){aiTurn();}
+      },400);
     }else{aiTurn();}
   }catch(e){console.error('llmTurn错误:',e);aiTurn();}
 }
