@@ -149,22 +149,29 @@ const LLM = {
   /* ---------- 调用大模型 ---------- */
   async call(messages) {
     const url = this.config.baseUrl.replace(/\/+$/, '') + '/chat/completions';
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + this.config.apiKey
-      },
-      body: JSON.stringify({
-        model: this.config.model,
-        messages: messages,
-        temperature: 0.3,
-        max_tokens: 500
-      })
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status + ': ' + await resp.text());
-    const data = await resp.json();
-    return data.choices?.[0]?.message?.content || '';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + this.config.apiKey
+        },
+        body: JSON.stringify({
+          model: this.config.model,
+          messages: messages,
+          temperature: 0.3,
+          max_tokens: 500
+        }),
+        signal: controller.signal
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status + ': ' + await resp.text());
+      const data = await resp.json();
+      return data.choices?.[0]?.message?.content || '';
+    } finally {
+      clearTimeout(timer);
+    }
   },
 
   /* ---------- 解析 LLM 返回（三重容错） ---------- */
