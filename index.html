@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斗兽棋</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./css/base.css">
+    <link rel="stylesheet" href="./css/index.css">
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+    <div class="wrap">
+<h1 class="title">斗 兽 棋</h1>
+<div class="captured" id="cap2"><span class="lbl">蓝方阵亡：</span></div>
+<div class="board-frame"><div class="board" id="board"></div></div>
+<div class="captured" id="cap1"><span class="lbl">红方阵亡：</span></div>
+<div class="status-bar" id="status"><span class="dot p1"></span><span id="stxt">红方回合</span><button class="cancel-btn" id="cancelBtn" onclick="cancelSkill()" style="display:none">取消</button></div>
+<div class="skill-panel" id="skillPanel"></div>
+<div class="controls">
+<select class="sel" id="mode" onchange="onModeChange()"><option value="ai">人机(内置AI)</option><option value="llm">人机(大模型)</option><option value="pvp">双人</option><option value="online">联机对战</option></select>
+<select class="sel" id="diff"><option value="1">简单</option><option value="2" selected>中等</option><option value="3">困难</option></select>
+<button class="btn btn-sm" id="undoBtn" onclick="undo()" disabled>悔棋</button>
+<button class="btn" onclick="newGame()">新局</button>
+<button class="btn btn-sm" onclick="openPanel('settings')">设置</button>
+<button class="btn btn-sm" onclick="openPanel('rules')">规则</button>
+<button class="btn btn-sm" id="onlineBtn" onclick="openPanel('online')" style="display:none">联机</button>
+</div></div>
+<div class="overlay" id="overlay"><div class="ov-box"><h2 id="ovTitle"></h2><p id="ovMsg"></p><button class="btn" onclick="newGame()">再来一局</button></div></div>
+<div class="overlay" id="renameOverlay"><div class="ov-box"><h2 id="renameTitle">选择变身</h2><div id="renameButtons"></div><button class="btn" onclick="closeRename()" style="margin-top:6px">取消</button></div></div>
+
+<!-- 大模型设置面板 -->
+<div class="overlay-panel" id="llmPanel"><div class="panel-backdrop" onclick="closePanel('llm')"></div><div class="panel-content">
+<button class="panel-close" onclick="closePanel('llm')">&times;</button>
+<div class="panel-title">大 模 型 AI 设 置</div>
+<div class="llm-hint">接入后大模型将作为蓝方对手，可自主移动棋子和使用技能。Key 仅存本机浏览器。</div>
+<div class="setting-row"><div class="llm-field-label">启用大模型 AI</div><div class="toggle" id="llmToggle" onclick="toggleLLM()"></div></div>
+<div class="setting-row"><div class="llm-field-label">API 地址（OpenAI 兼容）</div></div>
+<input class="llm-input" id="llmBaseUrl" type="url" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" spellcheck="false">
+<div class="setting-row"><div class="llm-field-label">API Key</div></div>
+<input class="llm-input" id="llmApiKey" type="password" placeholder="sk-..." spellcheck="false">
+<div class="setting-row"><div class="llm-field-label">模型名称</div></div>
+<input class="llm-input" id="llmModel" type="text" placeholder="qwen-plus / doubao-pro / glm-4-flash" spellcheck="false">
+<div class="llm-hint">常用：通义千问 baseUrl=https://dashscope.aliyuncs.com/compatible-mode/v1 模型=qwen-plus；豆包 baseUrl=https://ark.cn-beijing.volces.com/api/v3；智谱 baseUrl=https://open.bigmodel.cn/api/paas/v4 模型=glm-4-flash</div>
+<div class="llm-actions"><button class="btn" onclick="saveLLMSettings()">保存</button><button class="btn btn-sm" onclick="testLLM()">测试连接</button></div>
+<div class="llm-status" id="llmStatus"></div>
+</div></div>
+
+<!-- 联机面板 -->
+<div class="overlay-panel" id="onlinePanel"><div class="panel-backdrop" onclick="closePanel('online')"></div><div class="panel-content">
+<button class="panel-close" onclick="closePanel('online')">&times;</button>
+<div class="panel-title">联 机 对 战</div>
+<div class="online-section">
+  <h3>创建房间</h3>
+  <button class="btn" onclick="onlineCreate()">创建房间</button>
+  <div class="room-code" id="roomCodeDisplay" style="display:none">房间号：<span id="roomCodeText"></span><br><small>把房间号告诉对手，等待加入…</small></div>
+</div>
+<div class="online-section">
+  <h3>加入房间</h3>
+  <input class="llm-input" id="joinCodeInput" type="text" placeholder="输入6位房间号" maxlength="6" style="width:120px;display:inline-block">
+  <button class="btn btn-sm" onclick="onlineJoin()">加入</button>
+</div>
+<div class="online-status" id="onlineStatus"></div>
+<div class="llm-hint">联机采用 WebRTC 点对点直连，不需要服务器。双方需在同一网络或可直连环境。房主执红方先手，访客执蓝方。</div>
+</div></div>
+
+<div class="overlay-panel" id="settingsPanel"><div class="panel-backdrop"></div><div class="panel-content"><div class="panel-title">技 能 配 置</div><table class="sk-table"><thead><tr><th></th><th>红方</th><th>蓝方</th></tr></thead><tbody id="skTableBody"></tbody></table><div class="presets" id="presetBar"></div><div class="settings-note">人机模式下AI不使用技能·被动始终生效；大模型模式下AI可自主使用技能</div><div class="settings-actions"><button class="btn" onclick="applySettings()">开始对局</button> <button class="btn btn-sm" onclick="openPanel('llm')">大模型设置</button></div></div></div>
+<div class="overlay-panel" id="rulesPanel"><div class="panel-backdrop" onclick="closePanel('rules')"></div><div class="panel-content"><button class="panel-close" onclick="closePanel('rules')">&times;</button><div class="panel-title">游 戏 规 则</div>
+<div class="rule-section"><h3>秒杀/无敌</h3><table class="tier-table"><thead><tr><th></th><th>低级无敌</th><th>中级无敌</th><th>高级无敌</th></tr></thead><tbody><tr><td><strong style="color:#e74c3c">低级秒杀</strong></td><td class="lose">✗</td><td class="lose">✗</td><td class="lose">✗</td></tr><tr><td><strong style="color:#e74c3c">中级秒杀</strong></td><td class="win">✓</td><td class="lose">✗</td><td class="lose">✗</td></tr><tr><td><strong style="color:#e74c3c">高级秒杀</strong></td><td class="win">✓</td><td class="win">✓</td><td class="lose">✗</td></tr></tbody></table></div>
+<div class="rule-section"><h3>技能作用总览</h3>
+<table class="skill-rule-table">
+  <thead><tr><th>技能</th><th>作用</th></tr></thead>
+  <tbody>
+  <tr><td class="sr-skill" style="color:#ffb300">突刺</td><td>指定己方单位连续再走1步；突刺2则永久额外+1步。</td></tr>
+  <tr><td class="sr-skill" style="color:#4dd0e1">扭转</td><td>选择两枚己方棋子互换位置，用于快速调整阵型。</td></tr>
+  <tr><td class="sr-skill" style="color:#26a69a">过河</td><td>本回合可跨越河流；过河2则永久获得越河能力。</td></tr>
+  <tr><td class="sr-skill" style="color:#8e24aa">变异</td><td>让己方单位等级+1，提升战斗力；不能变成狮/虎。</td></tr>
+  <tr><td class="sr-skill" style="color:#ff7043">挖坑 / 埋坑</td><td>挖坑把草地改为河流，埋坑把河流恢复成草地。</td></tr>
+  <tr><td class="sr-skill" style="color:#ef5350">自杀</td><td>牺牲己方一枚棋子，直接击杀一枚同属性敌方单位。</td></tr>
+  <tr><td class="sr-skill" style="color:#66bb6a">背水</td><td>指定单位进入短期强硬状态，适合硬扛与倒计时翻盘。</td></tr>
+  <tr><td class="sr-skill" style="color:#fdd835">★金身</td><td>短暂获得无敌、击杀增强与免疫陷阱，极难被压制。</td></tr>
+  <tr><td class="sr-skill" style="color:#ff8a65">猎人</td><td>在己方兽穴附近布置陷阱，敌方踩上会受伤害。</td></tr>
+  <tr><td class="sr-skill" style="color:#7cb342">硬化</td><td>为单位增加1点护甲并持续3回合，提高存活率。</td></tr>
+  <tr><td class="sr-skill" style="color:#e040fb">天机</td><td>½成功（中级秒杀敌方）/½失败（敌方秒杀己方）。</td></tr>
+  <tr><td class="sr-skill" style="color:#00bcd4">先机</td><td>反复赌成功，成功则获得多次额外回合，不成功则无加成。</td></tr>
+  <tr><td class="sr-skill" style="color:#ff5722">杀机</td><td>成功+4额外回合，失败则少1回合，极度依赖运气。</td></tr>
+  <tr><td class="sr-skill" style="color:#ab47bc">改名换姓</td><td>己方任意单位变成鼠/猫/狗/狼/豹/象（不可变狮虎）。</td></tr>
+  <tr><td class="sr-skill" style="color:#00e5ff">★浮空</td><td>被动：无视河流+陷阱，己方可挤同格。主动：减1回合并追加3回合额外奖励。</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="rule-section"><h3>被动技能</h3>
+<table class="skill-rule-table passive-rule-table">
+  <thead><tr><th>技能</th><th>作用</th></tr></thead>
+  <tbody>
+  <tr><td class="sr-skill" style="color:#26c6da">水生</td><td>己方所有鼠等级+1，且在水中可低级秒杀相邻陆地敌方（无视等级）。</td></tr>
+  <tr><td class="sr-skill" style="color:#ff1744">反攻</td><td>兽穴被攻陷时：摧毁攻入者→复活全部阵亡己方单位→启动20回合倒计时。倒计时内击败敌人则反败为胜，否则告负。限1次。</td></tr>
+  <tr><td class="sr-skill" style="color:#4caf50">堆积</td><td>己方单位若在空地上被敌人击杀，可在该处留下障碍，迟滞后续推进。</td></tr>
+  <tr><td class="sr-skill" style="color:#5c6bc0">长手</td><td>己方单位在攻击范围内可打到更远的目标，强化远程压制。</td></tr>
+  <tr><td class="sr-skill" style="color:#ff9800">排雷</td><td>踩到军用陷阱时不会受伤，且会顺带清理对方的陷阱。</td></tr>
+  <tr><td class="sr-skill" style="color:#00bcd4">生机</td><td>被攻击时½成功（1回合低级无敌）/½失败（己方阵亡）。限4次。</td></tr>
+  <tr><td class="sr-skill" style="color:#ff5722">反机</td><td>被攻击时½成功（反杀）/½失败（己方阵亡）。限3次，最后必成功。</td></tr>
+  <tr><td class="sr-skill" style="color:#e91e63">希望</td><td>己方象/鼠/虎/狮死亡≥2时，在己方3陷阱复活3个已死亡单位。限1次。</td></tr>
+  </tbody>
+</table>
+</div>
+<div style="text-align:center;margin-top:6px"><button class="btn" onclick="closePanel('rules')">知道了</button></div>
+</div></div>
+<script src="./index.js"></script>
+<script src="./js/llm.js"></script>
+<script src="./js/online.js"></script>
+</body>
+</html>
