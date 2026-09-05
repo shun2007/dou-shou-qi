@@ -6,9 +6,9 @@
 
 const LLM = {
   config: {
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     apiKey: '',
-    model: 'qwen-plus',
+    model: 'ep-20260905174601-f8mmt',
     enabled: false,
     thinking: false
   },
